@@ -133,11 +133,13 @@ data "talos_machine_configuration" "controlplane" {
   cluster_endpoint = "https://${proxmox_vm_qemu.talos_control_plane_node[0].default_ipv4_address}:6443"
   machine_type     = "controlplane"
   machine_secrets  = talos_machine_secrets.this.machine_secrets 
-  config_patches   = concat(
-    [templatefile("${path.module}/templates/installer.yaml.tmpl", {
+  config_patches   = [ 
+    templatefile("${path.module}/templates/installer.yaml.tmpl", {
       install_image = var.talos_install_image
-    })]
-  )
+    }),
+    file("${path.module}/files/no-cni.yaml"),
+    file("${path.module}/files/cilium-install.yaml"),
+  ]
 }
 
 resource "talos_machine_configuration_apply" "controlplane" {
@@ -172,11 +174,12 @@ data "talos_machine_configuration" "worker" {
   machine_type     = "worker"
   machine_secrets  = talos_machine_secrets.this.machine_secrets 
   depends_on       = [proxmox_vm_qemu.talos_control_plane_node[0]]
-  config_patches   = concat(
-    [templatefile("${path.module}/templates/installer.yaml.tmpl", {
+  config_patches   = [ 
+    templatefile("${path.module}/templates/installer.yaml.tmpl", {
       install_image = var.talos_install_image
-    })]
-  )
+    }),
+    file("${path.module}/files/no-cni.yaml"),
+  ]
 }
 
 resource "talos_machine_configuration_apply" "worker" {

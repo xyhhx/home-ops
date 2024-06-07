@@ -13,6 +13,8 @@ down:
 write-confs: $(KUBECONFIG) $(TALOSCONFIG)
 	${tofu_cmd} output -raw kubeconfig > $(KUBECONFIG) 
 	${tofu_cmd} output -raw talosconfig > $(TALOSCONFIG) 
+	chmod 600 $(KUBECONFIG)
+	chmod 600 $(TALOSCONFIG)
 
 .PHONY: tofu
 tofu:
