@@ -1,6 +1,8 @@
 .env
 *.env
 
+secrets/
+
 tofu/*.tfstate
 tofu/*.backup
 tofu/.auto.tfvars

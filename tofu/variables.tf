@@ -107,3 +107,14 @@ variable "pve_agent_timeout" {
   type        = number
   default     = 60
 }
+
+variable "talos_cluster_name" {
+	description = "The name of your Talos cluster"
+	type				= string
+	default 		= "pve-talos"
+}
+
+variable "talos_install_image" {
+	description = "The Talos image to install from (get this from factory.talos.dev)"
+	type				= string
+}

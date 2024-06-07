@@ -1,4 +1,22 @@
-resource "proxmox_vm_qemu" "talos-control-plane-node" {
+resource "random_id" "cluster_id" {
+  byte_length = 32
+}
+
+resource "talos_machine_secrets" "this" {}
+
+data "talos_machine_configuration" "controlplane" {
+  cluster_name     = var.talos_cluster_name
+  cluster_endpoint = "https://${proxmox_vm_qemu.talos_control_plane_node[0].default_ipv4_address}:6443"
+  machine_type     = "controlplane"
+  machine_secrets  = talos_machine_secrets.this.machine_secrets 
+	config_patches   = concat(
+		[templatefile("${path.module}/templates/installer.yaml.tmpl", {
+			install_image = var.talos_install_image
+		})]
+	)
+}
+
+resource "proxmox_vm_qemu" "talos_control_plane_node" {
   count = var.control_plane_nodes_count
 
   name        = "talos-control-plane-${count.index + 1}"
@@ -10,7 +28,7 @@ resource "proxmox_vm_qemu" "talos-control-plane-node" {
   agent         = 1
   agent_timeout = var.pve_agent_timeout 
 
-  memory  = var.total_control_plane_memory / var.control_plane_nodes_count 
+  memory  = floor(var.total_control_plane_memory / var.control_plane_nodes_count)
   cores   = var.control_plane_cores
   sockets = var.control_plane_sockets
   scsihw  = "virtio-scsi-single"
@@ -45,7 +63,53 @@ resource "proxmox_vm_qemu" "talos-control-plane-node" {
   }
 }
 
-resource "proxmox_vm_qemu" "talos-work-plane-node" {
+data "talos_client_configuration" "this" {
+  cluster_name         = var.talos_cluster_name
+  client_configuration = talos_machine_secrets.this.client_configuration 
+  endpoints            = [for i,v in proxmox_vm_qemu.talos_control_plane_node: v.default_ipv4_address]
+  nodes                = [for i,v in proxmox_vm_qemu.talos_control_plane_node: v.default_ipv4_address]
+}
+
+resource "talos_machine_configuration_apply" "controlplane" {
+  for_each = {for i,v in proxmox_vm_qemu.talos_control_plane_node: i => v} 
+
+  client_configuration        = talos_machine_secrets.this.client_configuration 
+  machine_configuration_input = data.talos_machine_configuration.controlplane.machine_configuration
+  node                        = each.value.default_ipv4_address
+  config_patches = [
+    yamlencode({
+      machine = {
+        install = {
+          disk = "/dev/sda"
+        }
+      }
+    }),
+  ]
+}
+
+resource "talos_machine_bootstrap" "controlplane" {
+  for_each = {for i,v in proxmox_vm_qemu.talos_control_plane_node: i => v} 
+  depends_on = [
+    talos_machine_configuration_apply.controlplane
+  ]
+  node                 = each.value.default_ipv4_address
+  client_configuration = talos_machine_secrets.this.client_configuration 
+}
+
+data "talos_machine_configuration" "worker" {
+  cluster_name     = var.talos_cluster_name
+  cluster_endpoint = "https://${proxmox_vm_qemu.talos_control_plane_node[0].default_ipv4_address}:6443"
+  machine_type     = "worker"
+  machine_secrets  = talos_machine_secrets.this.machine_secrets 
+	depends_on			 = [proxmox_vm_qemu.talos_control_plane_node[0]]
+	config_patches   		 = concat(
+		[templatefile("${path.module}/templates/installer.yaml.tmpl", {
+			install_image = var.talos_install_image
+		})]
+	)
+}
+
+resource "proxmox_vm_qemu" "talos_worker_node" {
   count = var.worker_nodes_count
 
   name        = "talos-work-plane-${count.index + 1}"
@@ -57,7 +121,7 @@ resource "proxmox_vm_qemu" "talos-work-plane-node" {
   agent         = 1
   agent_timeout = var.pve_agent_timeout
 
-  memory  = var.total_work_plane_memory / var.worker_nodes_count 
+  memory  = floor(var.total_work_plane_memory / var.worker_nodes_count)
   cores   = var.worker_cores
   sockets = var.worker_sockets
   scsihw  = "virtio-scsi-single"
@@ -97,3 +161,27 @@ resource "proxmox_vm_qemu" "talos-work-plane-node" {
     }
   }
 }
+
+resource "talos_machine_configuration_apply" "worker" {
+  for_each = {for i,v in proxmox_vm_qemu.talos_worker_node: i => v} 
+
+  client_configuration        = talos_machine_secrets.this.client_configuration
+  machine_configuration_input = data.talos_machine_configuration.worker.machine_configuration
+  node                        = each.value.default_ipv4_address
+  config_patches = [
+    yamlencode({
+      machine = {
+        install = {
+          disk = "/dev/sda"
+        }
+      }
+    }),
+  ]
+}
+
+data "talos_cluster_kubeconfig" "this" {
+  depends_on           = [talos_machine_bootstrap.controlplane]
+  client_configuration = talos_machine_secrets.this.client_configuration
+  node                 = proxmox_vm_qemu.talos_control_plane_node[0].default_ipv4_address 
+}
+

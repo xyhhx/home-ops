@@ -1,12 +1,9 @@
-output "control_plane_ids" {
-  value = {
-    for k, v in proxmox_vm_qemu.talos-control-plane-node : k => v.id
-  }
+output "talosconfig" {
+  value     = data.talos_client_configuration.this.talos_config
+  sensitive = true
 }
 
-output "worker_ids" {
-  value = {
-    for k, v in proxmox_vm_qemu.talos-work-plane-node : k => v.id
-  }
+output "kubeconfig" {
+  value     = data.talos_cluster_kubeconfig.this.kubeconfig_raw 
+  sensitive = true
 }
-
