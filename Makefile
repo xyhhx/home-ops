@@ -1,18 +1,22 @@
-tf_dir:=tofu
-tf_cmd:=tofu -chdir=tofu
+tofu_dir:=tofu
+tofu_cmd:=tofu -chdir=${tofu_dir}
 
-up:
+cluster:
 	$(MAKE) tofu plan
 	$(MAKE) tofu apply
 	$(MAKE) write-confs
 
-write-confs:
-	${tf_cmd} output -raw kubeconfig > $(KUBECONFIG) 
-	${tf_cmd} output -raw talosconfig > $(TALOSCONFIG) 
+down:
+	$(MAKE) tofu destroy
+	rm $(KUBECONFIG) $(TALOSCONFIG)
+
+write-confs: $(KUBECONFIG) $(TALOSCONFIG)
+	${tofu_cmd} output -raw kubeconfig > $(KUBECONFIG) 
+	${tofu_cmd} output -raw talosconfig > $(TALOSCONFIG) 
 
 .PHONY: tofu
 tofu:
-	${tf_cmd} $(filter-out $@, $(MAKECMDGOALS))
+	${tofu_cmd} $(filter-out $@, $(MAKECMDGOALS))
 
 %:
 	@:
