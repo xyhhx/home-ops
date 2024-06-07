@@ -1,1 +1,7 @@
 .env
+*.env
+
+tofu/*.tfstate
+tofu/*.backup
+tofu/.auto.tfvars
+tofu/.terraform/

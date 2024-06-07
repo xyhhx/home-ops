@@ -95,3 +95,15 @@ variable "pve_passthrough_disks" {
   type        = set(string)
   default     = []
 }
+
+variable "pve_vmid_start" {
+  description = "The ID for VMs to start from"
+  type        = number
+  default     = 100
+}
+
+variable "pve_agent_timeout" {
+  description = "How many seconds to wait for VMs' guest agents"
+  type        = number
+  default     = 60
+}

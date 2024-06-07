@@ -1,4 +1,0 @@
-*.tfstate
-*.backup
-.auto.tfvars
-.terraform/
